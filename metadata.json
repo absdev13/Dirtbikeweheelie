@@ -2,5 +2,7 @@
   "name": "Twelve O'Clock: Dirtbike Wheelie",
   "description": "Physics-based dirtbike wheelie simulator with rear-brake feathering, clutch pops, suspension dynamics, fender scrapes, and desert motocross hazards.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
