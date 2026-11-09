@@ -275,25 +275,35 @@ export const GameCanvas: React.FC<GameCanvasProps> = React.memo(
       };
     }, [onStateChange, onToggleMute]);
 
+    const containerRef = useRef<HTMLDivElement | null>(null);
+
     // Main 60fps RAF Simulation & Render Loop
     useEffect(() => {
       const canvas = canvasRef.current;
-      if (!canvas) return;
+      const container = containerRef.current;
+      if (!canvas || !container) return;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
       let animationFrameId: number;
       let lastTime = performance.now();
       let lastTelemetryTime = lastTime;
+      let viewWidth = container.clientWidth || window.innerWidth;
+      let viewHeight = container.clientHeight || window.innerHeight;
 
       const handleResize = () => {
+        if (!container) return;
+        viewWidth = container.clientWidth || window.innerWidth;
+        viewHeight = container.clientHeight || window.innerHeight;
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        canvas.width = Math.floor(window.innerWidth * dpr);
-        canvas.height = Math.floor(window.innerHeight * dpr);
+        canvas.width = Math.floor(viewWidth * dpr);
+        canvas.height = Math.floor(viewHeight * dpr);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       };
 
       handleResize();
+      const resizeObserver = new ResizeObserver(() => handleResize());
+      resizeObserver.observe(container);
       window.addEventListener('resize', handleResize);
 
       const loop = (now: number) => {
@@ -353,7 +363,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = React.memo(
             }
           }
 
-          renderer.render(ctx, sim, window.innerWidth, window.innerHeight);
+          renderer.render(ctx, sim, viewWidth, viewHeight);
 
           // Throttle React HUD telemetry state updates to ~20Hz
           if (now - lastTelemetryTime >= 50) {
@@ -369,12 +379,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = React.memo(
 
       return () => {
         cancelAnimationFrame(animationFrameId);
+        resizeObserver.disconnect();
         window.removeEventListener('resize', handleResize);
       };
     }, [onTelemetry, onStateChange]);
 
     return (
-      <div className="fixed inset-0 w-screen h-screen overflow-hidden bg-[#0B0D11]">
+      <div
+        ref={containerRef}
+        className="absolute inset-0 w-full h-full overflow-hidden bg-[#0B0D11]"
+      >
         <canvas
           ref={canvasRef}
           className="block w-full h-full"

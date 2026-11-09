@@ -4,7 +4,9 @@ import {
   BikeConfig,
   COURSES,
   CourseConfig,
+  DeviceMode,
   GameState,
+  ResolvedDevice,
   TelemetrySnapshot,
 } from '../game/types';
 
@@ -13,7 +15,10 @@ interface GameModalsProps {
   selectedBike: BikeConfig;
   selectedCourse: CourseConfig;
   telemetry: TelemetrySnapshot;
+  deviceMode: DeviceMode;
+  resolvedDevice: ResolvedDevice;
   isMuted: boolean;
+  onSelectDeviceMode: (mode: DeviceMode) => void;
   onSelectBike: (bike: BikeConfig) => void;
   onSelectCourse: (course: CourseConfig) => void;
   onStartGame: () => void;
@@ -28,7 +33,10 @@ export const GameModals: React.FC<GameModalsProps> = ({
   selectedBike,
   selectedCourse,
   telemetry,
+  deviceMode,
+  resolvedDevice,
   isMuted,
+  onSelectDeviceMode,
   onSelectBike,
   onSelectCourse,
   onStartGame,
@@ -41,6 +49,8 @@ export const GameModals: React.FC<GameModalsProps> = ({
 
   if (gameState === 'PLAYING') return null;
 
+  const isCompactMobile = resolvedDevice === 'MOBILE';
+
   // Dedicated Bikes & Maps Menu (GARAGE_MENU)
   if (gameState === 'GARAGE_MENU') {
     const sweetSpotSpan =
@@ -51,14 +61,14 @@ export const GameModals: React.FC<GameModalsProps> = ({
     const speedPct = Math.min(100, Math.round((selectedBike.maxSpeedKmh / 160) * 100));
 
     return (
-      <div className="fixed inset-0 pointer-events-none flex flex-col justify-between p-5 md:p-8 bg-gradient-to-r from-[#0B0D11]/95 via-[#0B0D11]/80 to-transparent">
+      <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-3 sm:p-5 md:p-8 bg-gradient-to-r from-[#0B0D11]/95 via-[#0B0D11]/85 to-transparent overflow-y-auto">
         {/* Header Bar */}
-        <div className="pointer-events-auto flex items-center justify-between gap-4 max-w-2xl bg-[#0B0D11]/95 border border-white/15 rounded-xl px-5 py-3.5">
+        <div className="pointer-events-auto flex flex-wrap items-center justify-between gap-3 max-w-2xl bg-[#0B0D11]/95 border border-white/15 rounded-xl px-4 py-3">
           <div>
-            <div className="text-xs font-mono font-bold text-[#FF5500]">
+            <div className="text-[11px] font-mono font-bold text-[#FF5500]">
               PADDOCK &amp; TRAIL SELECTOR
             </div>
-            <h2 className="font-display font-extrabold text-3xl tracking-wide text-white">
+            <h2 className="font-display font-extrabold text-2xl sm:text-3xl tracking-wide text-white">
               BIKES &amp; MAPS MENU
             </h2>
           </div>
@@ -68,7 +78,7 @@ export const GameModals: React.FC<GameModalsProps> = ({
             <button
               type="button"
               onClick={() => setGarageTab('BIKES')}
-              className={`px-4 py-2 rounded-md text-xs font-mono font-bold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              className={`min-h-[40px] px-4 py-1.5 rounded-md text-xs font-mono font-bold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                 garageTab === 'BIKES'
                   ? 'bg-[#FF5500] text-white'
                   : 'text-slate-300 hover:text-white'
@@ -79,7 +89,7 @@ export const GameModals: React.FC<GameModalsProps> = ({
             <button
               type="button"
               onClick={() => setGarageTab('MAPS')}
-              className={`px-4 py-2 rounded-md text-xs font-mono font-bold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              className={`min-h-[40px] px-4 py-1.5 rounded-md text-xs font-mono font-bold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                 garageTab === 'MAPS'
                   ? 'bg-[#FF5500] text-white'
                   : 'text-slate-300 hover:text-white'
@@ -90,8 +100,8 @@ export const GameModals: React.FC<GameModalsProps> = ({
           </div>
         </div>
 
-        {/* Main Selector Body (Leaves right side open so player sees live bike & map preview!) */}
-        <div className="pointer-events-auto w-full max-w-2xl bg-[#0B0D11]/95 border border-white/15 rounded-xl p-5 space-y-5 my-auto max-h-[72vh] overflow-y-auto">
+        {/* Main Selector Body */}
+        <div className="pointer-events-auto w-full max-w-2xl bg-[#0B0D11]/95 border border-white/15 rounded-xl p-4 sm:p-5 space-y-4 my-auto max-h-[75vh] overflow-y-auto">
           {garageTab === 'BIKES' ? (
             <>
               <div className="flex items-baseline justify-between">
@@ -121,7 +131,6 @@ export const GameModals: React.FC<GameModalsProps> = ({
                         <span className="font-display font-bold text-xl tracking-wide text-white truncate">
                           {b.name}
                         </span>
-                        {/* Custom Bike Color Swatch */}
                         <div className="flex items-center gap-1 shrink-0">
                           <span
                             className="w-3.5 h-3.5 rounded-xs border border-white/20"
@@ -146,10 +155,10 @@ export const GameModals: React.FC<GameModalsProps> = ({
               </div>
 
               {/* Selected Bike Telemetry Specs */}
-              <div className="bg-[#12161F] border border-white/10 rounded-lg p-4 space-y-2.5 font-mono text-xs tabular-nums">
+              <div className="bg-[#12161F] border border-white/10 rounded-lg p-3.5 space-y-2.5 font-mono text-xs tabular-nums">
                 <div className="flex items-center justify-between text-slate-200 font-bold">
-                  <span>{selectedBike.name} — DYNO &amp; GEOMETRY SPECS</span>
-                  <span className="text-[#10B981]">
+                  <span className="truncate">{selectedBike.name} SPECS</span>
+                  <span className="text-[#10B981] shrink-0">
                     SWEET SPOT {selectedBike.balanceSweetSpotMin}°–{selectedBike.balanceSweetSpotMax}°
                   </span>
                 </div>
@@ -228,16 +237,15 @@ export const GameModals: React.FC<GameModalsProps> = ({
                       key={c.id}
                       type="button"
                       onClick={() => onSelectCourse(c)}
-                      className={`p-3.5 rounded-lg text-left transition-colors cursor-pointer border flex items-center gap-4 ${
+                      className={`p-3 rounded-lg text-left transition-colors cursor-pointer border flex items-center gap-3.5 ${
                         active
                           ? 'bg-[#1A202E] border-[#FF5500] text-white'
                           : 'bg-[#12161F] border-white/10 text-slate-300 hover:border-white/25 hover:text-white'
                       }`}
                     >
-                      {/* Mini SVG Terrain Swatch */}
                       <svg
-                        width="76"
-                        height="52"
+                        width="72"
+                        height="48"
                         viewBox="0 0 76 52"
                         className="rounded border border-white/15 shrink-0 overflow-hidden"
                       >
@@ -263,7 +271,7 @@ export const GameModals: React.FC<GameModalsProps> = ({
                           </span>
                         </div>
                         <div className="text-xs font-mono text-slate-400 mt-0.5">
-                          {c.region} · HAZARD DENSITY ×{c.hazardFrequency.toFixed(2)}
+                          {c.region} · HAZARDS ×{c.hazardFrequency.toFixed(2)}
                         </div>
                         <p className="text-xs text-slate-300 mt-1 line-clamp-1">
                           {c.description}
@@ -277,51 +285,60 @@ export const GameModals: React.FC<GameModalsProps> = ({
           )}
 
           {/* Footer Action Row */}
-          <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+          <div className="pt-2 flex flex-col sm:flex-row items-center gap-2.5">
             <button
               type="button"
               onClick={onStartGame}
-              className="w-full py-3.5 px-6 bg-[#FF5500] hover:bg-[#EA580C] text-white font-display font-extrabold text-xl tracking-wider rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+              className="w-full min-h-[48px] py-3 px-6 bg-[#FF5500] hover:bg-[#EA580C] text-white font-display font-extrabold text-xl tracking-wider rounded-lg transition-colors cursor-pointer whitespace-nowrap"
             >
-              RIDE {selectedBike.name} ON {selectedCourse.name} [ENTER]
+              RIDE {selectedBike.name} ON {selectedCourse.name}
             </button>
             <button
               type="button"
               onClick={onReturnToTitle}
-              className="w-full sm:w-auto py-3.5 px-5 bg-[#141821] hover:bg-slate-800 border border-white/15 text-slate-300 font-display font-bold text-lg tracking-wider rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+              className="w-full sm:w-auto min-h-[48px] py-3 px-5 bg-[#141821] hover:bg-slate-800 border border-white/15 text-slate-300 font-display font-bold text-lg tracking-wider rounded-lg transition-colors cursor-pointer whitespace-nowrap"
             >
               TITLE SCREEN
             </button>
           </div>
         </div>
 
-        {/* Bottom Control Legend */}
-        <div className="pointer-events-auto flex items-center justify-between text-xs font-mono text-slate-300 bg-[#0B0D11]/90 border border-white/10 rounded-lg px-4 py-2.5 max-w-2xl whitespace-nowrap overflow-x-auto">
-          <span>W/↑ Throttle</span>
-          <span aria-hidden="true" className="text-slate-600">·</span>
-          <span>S/↓ Rear Brake</span>
-          <span aria-hidden="true" className="text-slate-600">·</span>
-          <span>Hold C/Shift Clutch Dump</span>
-          <span aria-hidden="true" className="text-slate-600">·</span>
-          <span>Q/E Shift Gears</span>
-          <span aria-hidden="true" className="text-slate-600">·</span>
-          <span>Space Stunts</span>
+        {/* Bottom Device Mode Bar */}
+        <div className="pointer-events-auto flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-slate-300 bg-[#0B0D11]/90 border border-white/10 rounded-lg px-4 py-2 max-w-2xl">
+          <span>DEVICE VERSION:</span>
+          <div className="flex items-center gap-1">
+            {(['AUTO', 'MOBILE', 'TABLET', 'DESKTOP'] as DeviceMode[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => onSelectDeviceMode(m)}
+                className={`px-2.5 py-1 rounded transition-colors cursor-pointer ${
+                  deviceMode === m
+                    ? 'bg-[#FF5500] text-white font-bold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     );
   }
 
+  // TITLE_MENU (Adapts cleanly across Mobile, Tablet & Desktop)
   if (gameState === 'TITLE_MENU') {
     return (
-      <div className="fixed inset-0 pointer-events-none flex flex-col justify-between p-6 md:p-10 bg-gradient-to-r from-[#0B0D11]/92 via-[#0B0D11]/55 to-transparent">
-        {/* Top Row: Bespoke SVG Title Lockup & Audio Toggle */}
-        <div className="flex items-start justify-between gap-6">
+      <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-3.5 sm:p-6 md:p-10 bg-gradient-to-r from-[#0B0D11]/92 via-[#0B0D11]/60 to-transparent overflow-y-auto">
+        {/* Top Row: Bespoke SVG Title Lockup & Device/Audio Toggles */}
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="pointer-events-auto max-w-xl">
             <svg
               width="380"
               height="86"
               viewBox="0 0 380 86"
-              className="w-full max-w-[380px] h-auto overflow-visible"
+              className="w-full max-w-[290px] sm:max-w-[380px] h-auto overflow-visible"
               role="img"
               aria-label="Twelve O'Clock Dirtbike Wheelie"
             >
@@ -377,40 +394,63 @@ export const GameModals: React.FC<GameModalsProps> = ({
               </text>
             </svg>
 
-            <p className="mt-2 text-sm text-slate-300 max-w-md leading-relaxed">
-              Hold the clutch to rev-bomb into the {selectedBike.balanceSweetSpotMin}°–
-              {selectedBike.balanceSweetSpotMax}° balance window, chase 1st through 6th gear mid-wheelie, and feather the rear brake to prevent looping out.
-            </p>
+            {!isCompactMobile && (
+              <p className="mt-1.5 text-xs sm:text-sm text-slate-300 max-w-md leading-relaxed">
+                Hold the clutch to rev-bomb into the {selectedBike.balanceSweetSpotMin}°–
+                {selectedBike.balanceSweetSpotMax}° balance window, chase 1st through 6th gear mid-wheelie, and feather the rear brake to prevent looping out.
+              </p>
+            )}
           </div>
 
-          {/* Right Perimeter: High Score & Mute Toggle */}
-          <div className="pointer-events-auto flex items-center gap-4 bg-[#0B0D11]/90 border border-white/10 rounded-lg px-4 py-2.5">
-            <div className="text-right font-mono tabular-nums">
-              <div className="text-[11px] text-slate-400">PERSONAL RECORD</div>
-              <div className="text-sm font-bold text-white">
-                {telemetry.bestScore.toLocaleString()} PTS · {telemetry.bestWheelieDistanceM}M
+          {/* Right Perimeter: Device Mode Switcher, High Score & Mute Toggle */}
+          <div className="pointer-events-auto flex flex-col items-end gap-2">
+            <div className="flex items-center gap-3 bg-[#0B0D11]/90 border border-white/10 rounded-lg px-3.5 py-2">
+              <div className="text-right font-mono tabular-nums">
+                <div className="text-[10px] text-slate-400">PERSONAL RECORD</div>
+                <div className="text-xs sm:text-sm font-bold text-white">
+                  {telemetry.bestScore.toLocaleString()} PTS · {telemetry.bestWheelieDistanceM}M
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={onToggleMute}
+                className="min-h-[38px] px-3 py-1.5 bg-[#181C26] hover:bg-slate-800 border border-white/10 rounded text-xs font-mono font-bold text-slate-200 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                {isMuted ? 'SOUND: OFF' : 'SOUND: ON'}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={onToggleMute}
-              className="px-3 py-1.5 bg-[#181C26] hover:bg-slate-800 border border-white/10 rounded text-xs font-mono font-bold text-slate-200 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-            >
-              {isMuted ? 'SOUND: OFF' : 'SOUND: ON'}
-            </button>
+
+            {/* Interactive Mobile / Tablet / Desktop Version Switcher */}
+            <div className="flex items-center gap-1 bg-[#0B0D11]/92 border border-white/15 rounded-lg p-1 text-[11px] font-mono">
+              <span className="text-slate-400 px-2 hidden sm:inline">VERSION:</span>
+              {(['AUTO', 'MOBILE', 'TABLET', 'DESKTOP'] as DeviceMode[]).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => onSelectDeviceMode(m)}
+                  className={`min-h-[32px] px-2.5 py-1 rounded transition-colors cursor-pointer ${
+                    deviceMode === m
+                      ? 'bg-[#FF5500] text-white font-bold'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         {/* Left-Aligned Configuration Panel */}
-        <div className="pointer-events-auto w-full max-w-xl bg-[#0B0D11]/92 border border-white/12 rounded-xl p-5 space-y-4">
+        <div className="pointer-events-auto w-full max-w-xl bg-[#0B0D11]/92 border border-white/12 rounded-xl p-4 sm:p-5 space-y-3.5 my-2">
           {/* Quick Bike Selector */}
           <div>
-            <div className="flex items-baseline justify-between mb-2">
+            <div className="flex items-baseline justify-between mb-1.5">
               <span className="text-xs font-mono font-bold text-slate-300">
-                01. MACHINE ({BIKES.length} AVAILABLE)
+                01. MACHINE ({BIKES.length} BIKES)
               </span>
-              <span className="text-xs font-mono text-slate-400 tabular-nums">
-                {selectedBike.displacement} · {selectedBike.strokeType} · TOP {selectedBike.maxSpeedKmh} KM/H
+              <span className="text-[11px] font-mono text-slate-400 tabular-nums">
+                {selectedBike.displacement} · {selectedBike.strokeType}
               </span>
             </div>
 
@@ -422,7 +462,7 @@ export const GameModals: React.FC<GameModalsProps> = ({
                     key={b.id}
                     type="button"
                     onClick={() => onSelectBike(b)}
-                    className={`px-2.5 py-2 rounded-md text-left transition-colors cursor-pointer ${
+                    className={`min-h-[44px] px-2.5 py-1.5 rounded-md text-left transition-colors cursor-pointer ${
                       active
                         ? 'bg-[#1F2533] text-white border border-white/15'
                         : 'text-slate-400 hover:text-white'
@@ -448,12 +488,12 @@ export const GameModals: React.FC<GameModalsProps> = ({
 
           {/* Quick Course Selector */}
           <div>
-            <div className="flex items-baseline justify-between mb-2">
+            <div className="flex items-baseline justify-between mb-1.5">
               <span className="text-xs font-mono font-bold text-slate-300">
-                02. MAP ({COURSES.length} AVAILABLE)
+                02. MAP ({COURSES.length} COURSES)
               </span>
-              <span className="text-xs font-mono text-slate-400">
-                {selectedCourse.region} · {selectedCourse.difficulty}
+              <span className="text-[11px] font-mono text-slate-400 truncate max-w-[180px]">
+                {selectedCourse.region}
               </span>
             </div>
 
@@ -465,7 +505,7 @@ export const GameModals: React.FC<GameModalsProps> = ({
                     key={c.id}
                     type="button"
                     onClick={() => onSelectCourse(c)}
-                    className={`px-2.5 py-2 rounded-md text-left transition-colors cursor-pointer ${
+                    className={`min-h-[44px] px-2.5 py-1.5 rounded-md text-left transition-colors cursor-pointer ${
                       active
                         ? 'bg-[#1F2533] text-white border border-white/15'
                         : 'text-slate-400 hover:text-white'
@@ -488,31 +528,41 @@ export const GameModals: React.FC<GameModalsProps> = ({
             <button
               type="button"
               onClick={onStartGame}
-              className="w-full py-3.5 px-6 bg-[#FF5500] hover:bg-[#EA580C] active:bg-[#C2410C] text-white font-display font-extrabold text-xl tracking-wider rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+              className="w-full min-h-[48px] py-3 px-6 bg-[#FF5500] hover:bg-[#EA580C] active:bg-[#C2410C] text-white font-display font-extrabold text-xl tracking-wider rounded-lg transition-colors cursor-pointer whitespace-nowrap"
             >
-              START RUN [ENTER / SPACE]
+              START RUN ({resolvedDevice} MODE)
             </button>
             <button
               type="button"
               onClick={onOpenGarage}
-              className="w-full sm:w-auto py-3.5 px-5 bg-[#181C26] hover:bg-slate-800 border border-white/15 text-white font-display font-bold text-lg tracking-wider rounded-lg transition-colors cursor-pointer whitespace-nowrap shrink-0"
+              className="w-full sm:w-auto min-h-[48px] py-3 px-5 bg-[#181C26] hover:bg-slate-800 border border-white/15 text-white font-display font-bold text-lg tracking-wider rounded-lg transition-colors cursor-pointer whitespace-nowrap shrink-0"
             >
-              BIKES &amp; MAPS MENU [B]
+              BIKES &amp; MAPS MENU
             </button>
           </div>
         </div>
 
         {/* Single Flat Control-Hint Line */}
-        <div className="pointer-events-auto flex items-center justify-between text-xs font-mono text-slate-300 bg-[#0B0D11]/90 border border-white/10 rounded-lg px-4 py-2.5 max-w-xl whitespace-nowrap overflow-x-auto">
-          <span>W/↑ Throttle</span>
-          <span aria-hidden="true" className="text-slate-600">·</span>
-          <span>S/↓ Rear Brake</span>
-          <span aria-hidden="true" className="text-slate-600">·</span>
-          <span>C/Shift Hold Clutch</span>
-          <span aria-hidden="true" className="text-slate-600">·</span>
-          <span>Q/E Shift Gear</span>
-          <span aria-hidden="true" className="text-slate-600">·</span>
-          <span>Space Stunts</span>
+        <div className="pointer-events-auto flex items-center justify-between text-[11px] sm:text-xs font-mono text-slate-300 bg-[#0B0D11]/90 border border-white/10 rounded-lg px-4 py-2 max-w-xl whitespace-nowrap overflow-x-auto">
+          {resolvedDevice === 'DESKTOP' ? (
+            <>
+              <span>W/↑ Throttle</span>
+              <span aria-hidden="true" className="text-slate-600">·</span>
+              <span>S/↓ Rear Brake</span>
+              <span aria-hidden="true" className="text-slate-600">·</span>
+              <span>C/Shift Clutch</span>
+              <span aria-hidden="true" className="text-slate-600">·</span>
+              <span>Q/E Gearshift</span>
+              <span aria-hidden="true" className="text-slate-600">·</span>
+              <span>Space Stunts</span>
+            </>
+          ) : (
+            <>
+              <span>Left Thumb: Rear Brake · Hold Clutch · Lean</span>
+              <span aria-hidden="true" className="text-slate-600">·</span>
+              <span>Right Thumb: Throttle · Gear ± · Stunts</span>
+            </>
+          )}
         </div>
       </div>
     );
@@ -522,87 +572,114 @@ export const GameModals: React.FC<GameModalsProps> = ({
   const isGameOver = gameState === 'GAME_OVER';
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center p-6 bg-[#0B0D11]/80">
-      <div className="w-full max-w-lg bg-[#11151E] border border-white/15 rounded-xl p-6 md:p-8 space-y-6">
-        <div className="border-b border-white/10 pb-4">
-          <div className="text-xs font-mono font-bold text-[#FF5500]">
-            {isGameOver ? 'RUN TERMINATED' : 'SIMULATION PAUSED'}
+    <div className="absolute inset-0 flex items-center justify-center p-4 sm:p-6 bg-[#0B0D11]/85 overflow-y-auto">
+      <div className="w-full max-w-lg bg-[#11151E] border border-white/15 rounded-xl p-5 sm:p-7 space-y-5">
+        <div className="border-b border-white/10 pb-3.5 flex items-start justify-between gap-2">
+          <div>
+            <div className="text-xs font-mono font-bold text-[#FF5500]">
+              {isGameOver ? 'RUN TERMINATED' : 'SIMULATION PAUSED'}
+            </div>
+            <h2 className="font-display font-extrabold text-3xl sm:text-4xl tracking-wide text-white mt-0.5">
+              {isGameOver ? 'WIPEOUT SUMMARY' : 'PAUSED'}
+            </h2>
+            {isGameOver && telemetry.crashReason && (
+              <p className="mt-1 text-xs font-mono text-[#FCA5A5]">
+                {telemetry.crashReason}
+              </p>
+            )}
           </div>
-          <h2 className="font-display font-extrabold text-4xl tracking-wide text-white mt-1">
-            {isGameOver ? 'WIPEOUT SUMMARY' : 'PAUSED'}
-          </h2>
-          {isGameOver && telemetry.crashReason && (
-            <p className="mt-1.5 text-xs font-mono text-[#FCA5A5]">
-              {telemetry.crashReason}
-            </p>
-          )}
+
+          <span className="text-[11px] font-mono text-slate-400">
+            {resolvedDevice} VIEW
+          </span>
         </div>
 
         {/* Tabular Telemetry Readout Grid */}
-        <div className="grid grid-cols-2 gap-4 font-mono tabular-nums">
-          <div className="bg-[#0B0D11] border border-white/10 rounded-lg p-3.5">
-            <div className="text-xs text-slate-400">RUN SCORE</div>
-            <div className="text-2xl font-bold text-white mt-0.5">
+        <div className="grid grid-cols-2 gap-3 font-mono tabular-nums">
+          <div className="bg-[#0B0D11] border border-white/10 rounded-lg p-3">
+            <div className="text-[11px] text-slate-400">RUN SCORE</div>
+            <div className="text-xl sm:text-2xl font-bold text-white mt-0.5">
               {telemetry.score.toLocaleString()}
             </div>
-            <div className="text-[11px] text-slate-400 mt-1">
+            <div className="text-[10px] text-slate-400 mt-1">
               BEST: {telemetry.bestScore.toLocaleString()}
             </div>
           </div>
 
-          <div className="bg-[#0B0D11] border border-white/10 rounded-lg p-3.5">
-            <div className="text-xs text-slate-400">LONGEST WHEELIE</div>
-            <div className="text-2xl font-bold text-[#10B981] mt-0.5">
+          <div className="bg-[#0B0D11] border border-white/10 rounded-lg p-3">
+            <div className="text-[11px] text-slate-400">LONGEST WHEELIE</div>
+            <div className="text-xl sm:text-2xl font-bold text-[#10B981] mt-0.5">
               {telemetry.bestWheelieDistanceM}m
             </div>
-            <div className="text-[11px] text-slate-400 mt-1">
+            <div className="text-[10px] text-slate-400 mt-1">
               TOTAL RUN: {telemetry.totalDistanceM}m
             </div>
           </div>
 
-          <div className="bg-[#0B0D11] border border-white/10 rounded-lg p-3.5">
-            <div className="text-xs text-slate-400">12 O’CLOCK SCRAPES</div>
-            <div className="text-xl font-bold text-[#FBBF24] mt-0.5">
+          <div className="bg-[#0B0D11] border border-white/10 rounded-lg p-3">
+            <div className="text-[11px] text-slate-400">12 O’CLOCK SCRAPES</div>
+            <div className="text-lg sm:text-xl font-bold text-[#FBBF24] mt-0.5">
               {telemetry.scrapeCount} SCRAPES
             </div>
           </div>
 
-          <div className="bg-[#0B0D11] border border-white/10 rounded-lg p-3.5">
-            <div className="text-xs text-slate-400">STUNTS LANDED</div>
-            <div className="text-xl font-bold text-[#38BDF8] mt-0.5">
+          <div className="bg-[#0B0D11] border border-white/10 rounded-lg p-3">
+            <div className="text-[11px] text-slate-400">STUNTS LANDED</div>
+            <div className="text-lg sm:text-xl font-bold text-[#38BDF8] mt-0.5">
               {telemetry.tricksLanded} TRICKS
             </div>
           </div>
         </div>
 
+        {/* Device Mode Switcher inside Pause/Wipeout Modal */}
+        <div className="flex items-center justify-between bg-[#0B0D11] border border-white/10 rounded-lg px-3 py-2 text-xs font-mono">
+          <span className="text-slate-400">LAYOUT VERSION:</span>
+          <div className="flex items-center gap-1">
+            {(['AUTO', 'MOBILE', 'TABLET', 'DESKTOP'] as DeviceMode[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => onSelectDeviceMode(m)}
+                className={`px-2 py-1 rounded transition-colors cursor-pointer ${
+                  deviceMode === m
+                    ? 'bg-[#FF5500] text-white font-bold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+        <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-1">
           {!isGameOver && (
             <button
               type="button"
               onClick={onResumeGame}
-              className="w-full py-3 px-5 bg-[#FF5500] hover:bg-[#EA580C] text-white font-display font-bold text-lg tracking-wider rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="w-full min-h-[48px] py-3 px-5 bg-[#FF5500] hover:bg-[#EA580C] text-white font-display font-bold text-lg tracking-wider rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
-              RESUME RUN [ESC]
+              RESUME RUN
             </button>
           )}
           <button
             type="button"
             onClick={onStartGame}
-            className={`w-full py-3 px-5 font-display font-bold text-lg tracking-wider rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+            className={`w-full min-h-[48px] py-3 px-5 font-display font-bold text-lg tracking-wider rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
               isGameOver
                 ? 'bg-[#FF5500] hover:bg-[#EA580C] text-white'
                 : 'bg-[#1E293B] hover:bg-slate-700 text-white'
             }`}
           >
-            {isGameOver ? 'PLAY AGAIN [SPACE / ENTER]' : 'RESTART RUN'}
+            {isGameOver ? 'PLAY AGAIN' : 'RESTART RUN'}
           </button>
           <button
             type="button"
             onClick={onOpenGarage}
-            className="w-full sm:w-auto py-3 px-5 bg-[#0B0D11] hover:bg-slate-900 border border-white/15 text-slate-200 font-display font-bold text-lg tracking-wider rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className="w-full sm:w-auto min-h-[48px] py-3 px-5 bg-[#0B0D11] hover:bg-slate-900 border border-white/15 text-slate-200 font-display font-bold text-lg tracking-wider rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
-            BIKES &amp; MAPS [B]
+            BIKES &amp; MAPS
           </button>
         </div>
       </div>

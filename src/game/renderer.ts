@@ -12,17 +12,32 @@ export class WheelieRenderer {
     // 1. Sky & Horizon Backdrop
     this.drawBackdrop(ctx, sim, width, height);
 
-    // 2. Camera Transform with decaying trauma shake
+    // 2. Responsive Camera Transform (adapts framing & zoom for Mobile, Tablet, and Desktop)
+    const isMobileViewport = width < 640;
+    const isTabletViewport = width >= 640 && width <= 1040;
+
+    const responsiveZoom = isMobileViewport
+      ? Math.max(0.62, Math.min(0.8, width / 720))
+      : isTabletViewport
+      ? Math.max(0.82, Math.min(0.95, width / 1050))
+      : 1.0;
+
+    const effectiveZoom = sim.camZoom * responsiveZoom;
+
+    const anchorXRatio = isMobileViewport ? 0.28 : isTabletViewport ? 0.31 : 0.34;
+    // Lift the playfield slightly higher on mobile/tablet so bottom thumb pedals never cover the bike
+    const anchorYRatio = isMobileViewport ? 0.49 : isTabletViewport ? 0.56 : 0.62;
+
     const shakeMag = sim.shakeTrauma * sim.shakeTrauma * 14;
     const shakeX = (Math.random() - 0.5) * 2 * shakeMag;
     const shakeY = (Math.random() - 0.5) * 2 * shakeMag;
 
-    ctx.translate(width * 0.34 + shakeX, height * 0.62 + shakeY);
-    ctx.scale(sim.camZoom, sim.camZoom);
+    ctx.translate(width * anchorXRatio + shakeX, height * anchorYRatio + shakeY);
+    ctx.scale(effectiveZoom, effectiveZoom);
     ctx.translate(-sim.camX, -sim.camY);
 
     // 3. World Props, Hazard Telegraphs & Terrain
-    this.drawTerrainAndHazards(ctx, sim, width, height);
+    this.drawTerrainAndHazards(ctx, sim, width / effectiveZoom, height / effectiveZoom);
 
     // 4. World-Space Wheelie Balance Arc Guide (subtle perimeter around rear wheel)
     if (sim.inWheelie && !sim.isCrashed) {

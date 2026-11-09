@@ -6,6 +6,9 @@ export type GameState =
   | 'ROUND_SUMMARY'
   | 'GAME_OVER';
 
+export type DeviceMode = 'AUTO' | 'MOBILE' | 'TABLET' | 'DESKTOP';
+export type ResolvedDevice = 'MOBILE' | 'TABLET' | 'DESKTOP';
+
 export type TrickType =
   | 'NONE'
   | 'CLUTCH_POP'
