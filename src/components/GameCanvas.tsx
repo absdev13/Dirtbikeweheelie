@@ -1,12 +1,15 @@
 import React, { useEffect, useRef } from 'react';
 import {
   BikeConfig,
+  CameraViewMode,
   CourseConfig,
   GameState,
+  RiderStance,
   TelemetrySnapshot,
 } from '../game/types';
 import { InputState, WheelieSimulation } from '../game/simulation';
-import { WheelieRenderer } from '../game/renderer';
+import { RewardCosmeticId } from '../game/dailyChallenges';
+import { isSoftwareGl, WheelieRenderer3D } from '../game/renderer3d';
 import { bikeAudio } from '../game/audio';
 
 export interface TouchInputControls {
@@ -14,20 +17,31 @@ export interface TouchInputControls {
   setBrake: (val: boolean) => void;
   setLeanBack: (val: boolean) => void;
   setLeanForward: (val: boolean) => void;
+  setSteerLeft: (val: boolean) => void;
+  setSteerRight: (val: boolean) => void;
   setClutch: (val: boolean) => void;
+  setBoost: (val: boolean) => void;
   shiftUp: () => void;
   shiftDown: () => void;
   toggleTransmission: () => void;
   triggerStunt: () => void;
+  cycleStance: () => void;
+  setStance: (stance: RiderStance) => void;
+  triggerSpecificTrick: (index: 1 | 2 | 3 | 4) => void;
+  cycleCamera: () => void;
+  rerollDailyChallenges: () => void;
+  selectDailyCosmetic: (cosmeticId: RewardCosmeticId) => void;
 }
 
 interface GameCanvasProps {
   gameState: GameState;
   bike: BikeConfig;
   course: CourseConfig;
+  cameraMode: CameraViewMode;
   runNonce: number;
   onTelemetry: (snapshot: TelemetrySnapshot) => void;
   onStateChange: (nextState: GameState) => void;
+  onCameraModeChange: (nextMode: CameraViewMode) => void;
   onToggleMute: () => void;
   controlsRef: React.MutableRefObject<TouchInputControls | null>;
 }
@@ -37,16 +51,27 @@ export const GameCanvas: React.FC<GameCanvasProps> = React.memo(
     gameState,
     bike,
     course,
+    cameraMode,
     runNonce,
     onTelemetry,
     onStateChange,
+    onCameraModeChange,
     onToggleMute,
     controlsRef,
   }) => {
-    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const canvasMountRef = useRef<HTMLDivElement | null>(null);
     const simRef = useRef<WheelieSimulation | null>(null);
-    const rendererRef = useRef<WheelieRenderer | null>(null);
+    const renderer3dRef = useRef<WheelieRenderer3D | null>(null);
     const gameStateRef = useRef<GameState>(gameState);
+    const onTelemetryRef = useRef(onTelemetry);
+    const onStateChangeRef = useRef(onStateChange);
+    const onCameraModeChangeRef = useRef(onCameraModeChange);
+
+    useEffect(() => {
+      onTelemetryRef.current = onTelemetry;
+      onStateChangeRef.current = onStateChange;
+      onCameraModeChangeRef.current = onCameraModeChange;
+    }, [onTelemetry, onStateChange, onCameraModeChange]);
 
     // Held keys and edge-triggered flags
     const inputRef = useRef<InputState>({
@@ -54,15 +79,20 @@ export const GameCanvas: React.FC<GameCanvasProps> = React.memo(
       brake: false,
       leanBack: false,
       leanForward: false,
+      steerLeft: false,
+      steerRight: false,
       clutchHeld: false,
       justReleasedClutch: false,
+      boostHeld: false,
       justPressedShiftUp: false,
       justPressedShiftDown: false,
       stuntHeld: false,
       justPressedStunt: false,
+      justPressedStanceCycle: false,
       justPressedTrick1: false,
       justPressedTrick2: false,
       justPressedTrick3: false,
+      justPressedTrick4: false,
     });
 
     const touchStateRef = useRef({
@@ -70,8 +100,18 @@ export const GameCanvas: React.FC<GameCanvasProps> = React.memo(
       brake: false,
       leanBack: false,
       leanForward: false,
+      steerLeft: false,
+      steerRight: false,
       clutchHeld: false,
+      boostHeld: false,
     });
+
+    // Sync cameraMode to 3D renderer
+    useEffect(() => {
+      if (renderer3dRef.current) {
+        renderer3dRef.current.setCameraMode(cameraMode);
+      }
+    }, [cameraMode]);
 
     // Expose direct imperative touch/mouse controls
     useEffect(() => {
@@ -90,12 +130,22 @@ export const GameCanvas: React.FC<GameCanvasProps> = React.memo(
         setLeanForward: (val: boolean) => {
           touchStateRef.current.leanForward = val;
         },
+        setSteerLeft: (val: boolean) => {
+          touchStateRef.current.steerLeft = val;
+        },
+        setSteerRight: (val: boolean) => {
+          touchStateRef.current.steerRight = val;
+        },
         setClutch: (val: boolean) => {
           bikeAudio.init();
           if (touchStateRef.current.clutchHeld && !val) {
             inputRef.current.justReleasedClutch = true;
           }
           touchStateRef.current.clutchHeld = val;
+        },
+        setBoost: (val: boolean) => {
+          bikeAudio.init();
+          touchStateRef.current.boostHeld = val;
         },
         shiftUp: () => {
           bikeAudio.init();
@@ -109,15 +159,53 @@ export const GameCanvas: React.FC<GameCanvasProps> = React.memo(
           bikeAudio.init();
           if (simRef.current) {
             simRef.current.toggleTransmissionMode();
-            onTelemetry(simRef.current.getTelemetry());
+            onTelemetryRef.current(simRef.current.getTelemetry());
           }
         },
         triggerStunt: () => {
           bikeAudio.init();
           inputRef.current.justPressedStunt = true;
         },
+        cycleStance: () => {
+          bikeAudio.init();
+          inputRef.current.justPressedStanceCycle = true;
+        },
+        setStance: (stance: RiderStance) => {
+          bikeAudio.init();
+          if (simRef.current) {
+            simRef.current.setRiderStance(stance);
+            onTelemetryRef.current(simRef.current.getTelemetry());
+          }
+        },
+        triggerSpecificTrick: (index: 1 | 2 | 3 | 4) => {
+          bikeAudio.init();
+          if (index === 1) inputRef.current.justPressedTrick1 = true;
+          else if (index === 2) inputRef.current.justPressedTrick2 = true;
+          else if (index === 3) inputRef.current.justPressedTrick3 = true;
+          else if (index === 4) inputRef.current.justPressedTrick4 = true;
+        },
+        cycleCamera: () => {
+          if (renderer3dRef.current) {
+            const nextMode = renderer3dRef.current.cycleCameraMode();
+            onCameraModeChangeRef.current(nextMode);
+          }
+        },
+        rerollDailyChallenges: () => {
+          bikeAudio.init();
+          if (simRef.current) {
+            simRef.current.rerollDailyChallenges();
+            onTelemetryRef.current(simRef.current.getTelemetry());
+          }
+        },
+        selectDailyCosmetic: (cosmeticId: RewardCosmeticId) => {
+          bikeAudio.init();
+          if (simRef.current) {
+            simRef.current.setActiveCosmetic(cosmeticId);
+            onTelemetryRef.current(simRef.current.getTelemetry());
+          }
+        },
       };
-    }, [controlsRef, onTelemetry]);
+    }, [controlsRef]);
 
     // Sync gameStateRef
     useEffect(() => {
@@ -134,13 +222,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = React.memo(
     useEffect(() => {
       if (!simRef.current) {
         simRef.current = new WheelieSimulation(bike, course);
-        rendererRef.current = new WheelieRenderer();
       } else {
         simRef.current.setBikeAndCourse(bike, course);
         simRef.current.gameState = gameStateRef.current;
       }
-      onTelemetry(simRef.current.getTelemetry());
-    }, [bike, course, runNonce, onTelemetry]);
+      onTelemetryRef.current(simRef.current.getTelemetry());
+    }, [bike, course, runNonce]);
 
     // Keyboard & Window Blur Listeners
     useEffect(() => {
@@ -149,13 +236,19 @@ export const GameCanvas: React.FC<GameCanvasProps> = React.memo(
         inputRef.current.brake = false;
         inputRef.current.leanBack = false;
         inputRef.current.leanForward = false;
+        inputRef.current.steerLeft = false;
+        inputRef.current.steerRight = false;
         inputRef.current.clutchHeld = false;
+        inputRef.current.boostHeld = false;
         inputRef.current.stuntHeld = false;
         touchStateRef.current.throttle = false;
         touchStateRef.current.brake = false;
         touchStateRef.current.leanBack = false;
         touchStateRef.current.leanForward = false;
+        touchStateRef.current.steerLeft = false;
+        touchStateRef.current.steerRight = false;
         touchStateRef.current.clutchHeld = false;
+        touchStateRef.current.boostHeld = false;
       };
 
       const handleKeyDown = (e: KeyboardEvent) => {
@@ -168,12 +261,21 @@ export const GameCanvas: React.FC<GameCanvasProps> = React.memo(
           return;
         }
 
+        if (code === 'KeyV') {
+          e.preventDefault();
+          if (renderer3dRef.current) {
+            const nextMode = renderer3dRef.current.cycleCameraMode();
+            onCameraModeChangeRef.current(nextMode);
+          }
+          return;
+        }
+
         if (code === 'KeyB' || code === 'Tab') {
           e.preventDefault();
           if (gameStateRef.current === 'GARAGE_MENU') {
-            onStateChange('PLAYING');
+            onStateChangeRef.current('PLAYING');
           } else {
-            onStateChange('GARAGE_MENU');
+            onStateChangeRef.current('GARAGE_MENU');
           }
           return;
         }
@@ -181,12 +283,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = React.memo(
         if (code === 'Escape') {
           e.preventDefault();
           if (gameStateRef.current === 'PLAYING') {
-            onStateChange('PAUSED');
+            onStateChangeRef.current('PAUSED');
           } else if (
             gameStateRef.current === 'PAUSED' ||
             gameStateRef.current === 'GARAGE_MENU'
           ) {
-            onStateChange('PLAYING');
+            onStateChangeRef.current('PLAYING');
           }
           return;
         }
@@ -197,7 +299,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = React.memo(
             gameStateRef.current === 'GAME_OVER'
           ) {
             e.preventDefault();
-            onStateChange('PLAYING');
+            onStateChangeRef.current('PLAYING');
             return;
           }
         }
@@ -216,9 +318,18 @@ export const GameCanvas: React.FC<GameCanvasProps> = React.memo(
         } else if (code === 'KeyD' || code === 'ArrowRight') {
           e.preventDefault();
           inputRef.current.leanForward = true;
+        } else if (code === 'KeyZ') {
+          e.preventDefault();
+          inputRef.current.steerLeft = true;
+        } else if (code === 'KeyX') {
+          e.preventDefault();
+          inputRef.current.steerRight = true;
         } else if (code === 'KeyC' || code === 'ShiftLeft' || code === 'ShiftRight') {
           e.preventDefault();
           inputRef.current.clutchHeld = true;
+        } else if (code === 'KeyF') {
+          e.preventDefault();
+          inputRef.current.boostHeld = true;
         } else if (code === 'KeyE') {
           e.preventDefault();
           if (!e.repeat) {
@@ -235,12 +346,19 @@ export const GameCanvas: React.FC<GameCanvasProps> = React.memo(
             inputRef.current.justPressedStunt = true;
           }
           inputRef.current.stuntHeld = true;
+        } else if (code === 'KeyG') {
+          e.preventDefault();
+          if (!e.repeat) {
+            inputRef.current.justPressedStanceCycle = true;
+          }
         } else if (code === 'Digit1') {
-          inputRef.current.justPressedTrick1 = true;
+          if (!e.repeat) inputRef.current.justPressedTrick1 = true;
         } else if (code === 'Digit2') {
-          inputRef.current.justPressedTrick2 = true;
+          if (!e.repeat) inputRef.current.justPressedTrick2 = true;
         } else if (code === 'Digit3') {
-          inputRef.current.justPressedTrick3 = true;
+          if (!e.repeat) inputRef.current.justPressedTrick3 = true;
+        } else if (code === 'Digit4') {
+          if (!e.repeat) inputRef.current.justPressedTrick4 = true;
         }
       };
 
@@ -254,11 +372,17 @@ export const GameCanvas: React.FC<GameCanvasProps> = React.memo(
           inputRef.current.leanBack = false;
         } else if (code === 'KeyD' || code === 'ArrowRight') {
           inputRef.current.leanForward = false;
+        } else if (code === 'KeyZ') {
+          inputRef.current.steerLeft = false;
+        } else if (code === 'KeyX') {
+          inputRef.current.steerRight = false;
         } else if (code === 'KeyC' || code === 'ShiftLeft' || code === 'ShiftRight') {
           if (inputRef.current.clutchHeld) {
             inputRef.current.justReleasedClutch = true;
           }
           inputRef.current.clutchHeld = false;
+        } else if (code === 'KeyF') {
+          inputRef.current.boostHeld = false;
         } else if (code === 'Space') {
           inputRef.current.stuntHeld = false;
         }
@@ -273,19 +397,23 @@ export const GameCanvas: React.FC<GameCanvasProps> = React.memo(
         window.removeEventListener('keyup', handleKeyUp);
         window.removeEventListener('blur', clearAllHeld);
       };
-    }, [onStateChange, onToggleMute]);
+    }, [onToggleMute]);
 
-    const containerRef = useRef<HTMLDivElement | null>(null);
-
-    // Main 60fps RAF Simulation & Render Loop
+    // Initialize 3D WebGLRenderer & Run Loop Once
     useEffect(() => {
-      const canvas = canvasRef.current;
-      const container = containerRef.current;
-      if (!canvas || !container) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+      const container = canvasMountRef.current;
+      if (!container) return;
 
-      let animationFrameId: number;
+      if (!simRef.current) {
+        simRef.current = new WheelieSimulation(bike, course);
+      }
+
+      const renderer3d = new WheelieRenderer3D(container);
+      renderer3d.setCameraMode(cameraMode);
+      renderer3dRef.current = renderer3d;
+
+      let frameId = 0;
+      let isMounted = true;
       let lastTime = performance.now();
       let lastTelemetryTime = lastTime;
       let viewWidth = container.clientWidth || window.innerWidth;
@@ -295,10 +423,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = React.memo(
         if (!container) return;
         viewWidth = container.clientWidth || window.innerWidth;
         viewHeight = container.clientHeight || window.innerHeight;
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        canvas.width = Math.floor(viewWidth * dpr);
-        canvas.height = Math.floor(viewHeight * dpr);
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        renderer3d.setSize(viewWidth, viewHeight);
       };
 
       handleResize();
@@ -306,15 +431,35 @@ export const GameCanvas: React.FC<GameCanvasProps> = React.memo(
       resizeObserver.observe(container);
       window.addEventListener('resize', handleResize);
 
-      const loop = (now: number) => {
-        const rawDt = (now - lastTime) / 1000;
+      const afterDraw = (cb: () => void) => {
+        const gl = renderer3d.renderer.getContext() as WebGL2RenderingContext;
+        if (!gl || typeof gl.fenceSync !== 'function') {
+          frameId = window.setTimeout(cb, 80);
+          return;
+        }
+        const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+        gl.flush();
+        const poll = () => {
+          if (!isMounted) return;
+          const state = sync && gl.getSyncParameter(sync, gl.SYNC_STATUS);
+          if (state === gl.UNSIGNALED) {
+            frameId = window.setTimeout(poll, 5);
+          } else {
+            if (sync) gl.deleteSync(sync);
+            frameId = window.setTimeout(cb, 80);
+          }
+        };
+        frameId = window.setTimeout(poll, 5);
+      };
+
+      const tick = () => {
+        if (!isMounted) return;
+        const now = performance.now();
+        const rawDt = Math.min(0.05, (now - lastTime) / 1000);
         lastTime = now;
 
         const sim = simRef.current;
-        const renderer = rendererRef.current;
-
-        if (sim && renderer) {
-          // Step simulation when in TITLE_MENU / GARAGE_MENU (live showcase) or PLAYING
+        if (sim) {
           if (
             gameStateRef.current === 'TITLE_MENU' ||
             gameStateRef.current === 'GARAGE_MENU' ||
@@ -329,71 +474,84 @@ export const GameCanvas: React.FC<GameCanvasProps> = React.memo(
               leanForward:
                 inputRef.current.leanForward ||
                 touchStateRef.current.leanForward,
+              steerLeft:
+                inputRef.current.steerLeft || touchStateRef.current.steerLeft,
+              steerRight:
+                inputRef.current.steerRight || touchStateRef.current.steerRight,
               clutchHeld:
                 inputRef.current.clutchHeld || touchStateRef.current.clutchHeld,
               justReleasedClutch: inputRef.current.justReleasedClutch,
+              boostHeld:
+                inputRef.current.boostHeld || touchStateRef.current.boostHeld,
               justPressedShiftUp: inputRef.current.justPressedShiftUp,
               justPressedShiftDown: inputRef.current.justPressedShiftDown,
               stuntHeld: inputRef.current.stuntHeld,
               justPressedStunt: inputRef.current.justPressedStunt,
+              justPressedStanceCycle: inputRef.current.justPressedStanceCycle,
               justPressedTrick1: inputRef.current.justPressedTrick1,
               justPressedTrick2: inputRef.current.justPressedTrick2,
               justPressedTrick3: inputRef.current.justPressedTrick3,
+              justPressedTrick4: inputRef.current.justPressedTrick4,
             };
 
-            // Clear edge-triggered flags immediately after reading
             inputRef.current.justReleasedClutch = false;
             inputRef.current.justPressedShiftUp = false;
             inputRef.current.justPressedShiftDown = false;
             inputRef.current.justPressedStunt = false;
+            inputRef.current.justPressedStanceCycle = false;
             inputRef.current.justPressedTrick1 = false;
             inputRef.current.justPressedTrick2 = false;
             inputRef.current.justPressedTrick3 = false;
+            inputRef.current.justPressedTrick4 = false;
 
             sim.step(rawDt, combinedInput);
 
-            // Transition to GAME_OVER after crash ragdoll settles
             if (
               gameStateRef.current === 'PLAYING' &&
               sim.isCrashed &&
               sim.crashTimer > 1.15
             ) {
-              onTelemetry(sim.getTelemetry());
-              onStateChange('GAME_OVER');
+              onTelemetryRef.current(sim.getTelemetry());
+              onStateChangeRef.current('GAME_OVER');
             }
           }
 
-          renderer.render(ctx, sim, viewWidth, viewHeight);
+          renderer3d.render(sim, viewWidth, viewHeight);
 
-          // Throttle React HUD telemetry state updates to ~20Hz
           if (now - lastTelemetryTime >= 50) {
             lastTelemetryTime = now;
-            onTelemetry(sim.getTelemetry());
+            onTelemetryRef.current(sim.getTelemetry());
           }
         }
 
-        animationFrameId = requestAnimationFrame(loop);
+        if (isSoftwareGl) {
+          afterDraw(tick);
+        } else {
+          frameId = requestAnimationFrame(tick);
+        }
       };
 
-      animationFrameId = requestAnimationFrame(loop);
+      frameId = requestAnimationFrame(tick);
 
       return () => {
-        cancelAnimationFrame(animationFrameId);
+        isMounted = false;
+        cancelAnimationFrame(frameId);
+        clearTimeout(frameId);
         resizeObserver.disconnect();
         window.removeEventListener('resize', handleResize);
+        renderer3d.dispose();
+        if (container.contains(renderer3d.renderer.domElement)) {
+          container.removeChild(renderer3d.renderer.domElement);
+        }
       };
-    }, [onTelemetry, onStateChange]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     return (
       <div
-        ref={containerRef}
+        ref={canvasMountRef}
         className="absolute inset-0 w-full h-full overflow-hidden bg-[#0B0D11]"
-      >
-        <canvas
-          ref={canvasRef}
-          className="block w-full h-full"
-        />
-      </div>
+      />
     );
   }
 );

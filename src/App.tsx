@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BIKES,
   BikeConfig,
+  CameraViewMode,
   COURSES,
   CourseConfig,
   DeviceMode,
@@ -9,6 +10,12 @@ import {
   ResolvedDevice,
   TelemetrySnapshot,
 } from './game/types';
+import {
+  DailyChallengeItem,
+  findMatchingEquipForChallenge,
+  loadDailyChallengeState,
+  RewardCosmeticId,
+} from './game/dailyChallenges';
 import { GameCanvas, TouchInputControls } from './components/GameCanvas';
 import { GameHUD } from './components/GameHUD';
 import { GameModals } from './components/GameModals';
@@ -30,15 +37,31 @@ const INITIAL_TELEMETRY: TelemetrySnapshot = {
   transmissionMode: 'AUTO',
   clutchPulled: false,
   clutchCharge: 0,
+  boostCharge: 0.65,
+  boostActive: false,
   wheelieAngleDeg: 0,
   angularVelocityDeg: 0,
+  lateralOffsetM: 0,
+  rollAngleDeg: 0,
   inWheelie: false,
   inSweetSpot: false,
   isScraping: false,
+  isCoasting: false,
+  riderStance: 'NORMAL',
   activeTrick: 'NONE',
   rearBrakeHeat: 0,
   activeHazard: 'NONE',
   upcomingHazard: null,
+  activeChallenge: {
+    title: 'HOLD A 50M WHEELIE',
+    progress: 0,
+    target: 50,
+    unit: 'M',
+    rewardPts: 1500,
+  },
+  dailyState: loadDailyChallengeState(),
+  riderLevel: 1,
+  riderRankTitle: 'LOT ROOKIE',
   callouts: [],
   crashReason: null,
   scrapeCount: 0,
@@ -55,6 +78,7 @@ export default function App() {
   const [gameState, setGameState] = useState<GameState>('TITLE_MENU');
   const [selectedBike, setSelectedBike] = useState<BikeConfig>(BIKES[0]);
   const [selectedCourse, setSelectedCourse] = useState<CourseConfig>(COURSES[0]);
+  const [cameraMode, setCameraMode] = useState<CameraViewMode>('CHASE');
   const [runNonce, setRunNonce] = useState<number>(0);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [telemetry, setTelemetry] = useState<TelemetrySnapshot>(INITIAL_TELEMETRY);
@@ -141,6 +165,34 @@ export default function App() {
     setDeviceMode(mode);
   }, []);
 
+  const handleEquipAndRideChallenge = useCallback(
+    (challenge: DailyChallengeItem) => {
+      bikeAudio.init();
+      bikeAudio.playTrickChime(3);
+      const matched = findMatchingEquipForChallenge(
+        challenge,
+        selectedBike,
+        selectedCourse
+      );
+      setSelectedBike(matched.bike);
+      setSelectedCourse(matched.course);
+      setRunNonce((n) => n + 1);
+      setGameState('PLAYING');
+    },
+    [selectedBike, selectedCourse]
+  );
+
+  const handleRerollDailyChallenges = useCallback(() => {
+    controlsRef.current?.rerollDailyChallenges();
+  }, []);
+
+  const handleSelectDailyCosmetic = useCallback(
+    (cosmeticId: RewardCosmeticId) => {
+      controlsRef.current?.selectDailyCosmetic(cosmeticId);
+    },
+    []
+  );
+
   // Frame container styling when previewing Mobile or Tablet version on a large screen
   const frameClass = isSimulatedFrameOnDesktop
     ? resolvedDevice === 'MOBILE'
@@ -180,14 +232,16 @@ export default function App() {
 
       {/* Active Game Viewport Shell */}
       <div className={frameClass}>
-        {/* Isolated 60fps Canvas Simulation */}
+        {/* Isolated 3D WebGL Simulation */}
         <GameCanvas
           gameState={gameState}
           bike={selectedBike}
           course={selectedCourse}
+          cameraMode={cameraMode}
           runNonce={runNonce}
           onTelemetry={setTelemetry}
           onStateChange={handleStateChange}
+          onCameraModeChange={setCameraMode}
           onToggleMute={handleToggleMute}
           controlsRef={controlsRef}
         />
@@ -198,6 +252,7 @@ export default function App() {
             telemetry={telemetry}
             bike={selectedBike}
             course={selectedCourse}
+            cameraMode={cameraMode}
             deviceMode={deviceMode}
             resolvedDevice={resolvedDevice}
             isMuted={isMuted}
@@ -226,6 +281,9 @@ export default function App() {
           onOpenGarage={handleOpenGarage}
           onReturnToTitle={handleReturnToTitle}
           onToggleMute={handleToggleMute}
+          onEquipAndRideChallenge={handleEquipAndRideChallenge}
+          onRerollDailyChallenges={handleRerollDailyChallenges}
+          onSelectDailyCosmetic={handleSelectDailyCosmetic}
         />
       </div>
     </main>
